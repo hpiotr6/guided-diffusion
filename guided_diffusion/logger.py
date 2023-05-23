@@ -443,6 +443,17 @@ def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
     """
     If comm is provided, average all numerical stats across that comm
     """
+
+    import wandb
+    wandb.login()
+    run = wandb.init(
+    # Set the project where this run will be logged
+    project="guided-diffusion",
+    # Track hyperparameters and run metadata
+    )
+
+
+    
     if dir is None:
         dir = os.getenv("OPENAI_LOGDIR")
     if dir is None:

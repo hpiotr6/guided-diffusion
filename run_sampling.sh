@@ -12,6 +12,6 @@ MODEL_FLAGS="--attention_resolutions 32,16,8
 --num_res_blocks 3 
 --resblock_updown True 
 --use_new_attention_order True 
---use_fp16 True 
+--use_fp16 True
 --use_scale_shift_norm True"
-python module scripts.classifier_sample.py $MODEL_FLAGS --classifier_scale 1.0 --classifier_path models/64x64_classifier.pt --classifier_depth 4 --model_path models/64x64_diffusion.pt $SAMPLE_FLAGS
+python -m scripts.classifier_sample $MODEL_FLAGS --classifier_scale 1.0 --classifier_path models/64x64_classifier.pt --classifier_depth 4 --model_path models/64x64_diffusion.pt $SAMPLE_FLAGS

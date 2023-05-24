@@ -43,7 +43,23 @@ def load_data(
     if class_cond:
         # Assume classes are the first part of the filename,
         # before an underscore.
-        class_names = [bf.basename(path).split("_")[0] for path in all_files]
+        import re
+        regex = r"([A-Za-z]+_?[A-Za-z]+).*-([CR])-.*\.png"
+        class_names=[]
+        for path in all_files:
+            filename = bf.basename(path)
+            match = re.match(regex, filename)
+            if match:
+                city = match.group(1)
+                element = match.group(2)
+                class_names.append(element)
+                # print("City:", city)
+                # print("Element:", element)
+            else:
+                raise ValueError("No match found for filename:", filename)
+
+
+        # class_names = [bf.basename(path).split("_")[0] for path in all_files]
         sorted_classes = {x: i for i, x in enumerate(sorted(set(class_names)))}
         classes = [sorted_classes[x] for x in class_names]
     dataset = ImageDataset(

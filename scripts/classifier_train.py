@@ -63,8 +63,8 @@ def main():
 
     model = DDP(
         model,
-        device_ids=[dist_util.dev()],
-        output_device=dist_util.dev(),
+        device_ids=[dist_util.dev()] if dist_util.dev().type!='cpu' else None,
+        output_device=dist_util.dev() if dist_util.dev().type!='cpu' else None,
         broadcast_buffers=False,
         bucket_cap_mb=128,
         find_unused_parameters=False,

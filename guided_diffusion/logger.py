@@ -225,6 +225,7 @@ def logkv_mean(key, val):
     The same as logkv(), but if called many times, values averaged.
     """
     get_current().logkv_mean(key, val)
+    wandb.log({key:val})
 
 
 def logkvs(d):

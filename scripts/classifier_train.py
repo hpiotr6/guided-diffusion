@@ -31,6 +31,8 @@ def main():
     dist_util.setup_dist()
     logger.configure()
 
+    print(dist_util.dev())
+
     logger.log("creating model and diffusion...")
     model, diffusion = create_classifier_and_diffusion(
         **args_to_dict(args, classifier_and_diffusion_defaults().keys())

@@ -9,6 +9,7 @@ MODEL_FLAGS="--attention_resolutions 32,16,8
 --noise_schedule cosine 
 --num_channels 192 
 --num_head_channels 64 
+--classifier_width 64
 --num_res_blocks 3 
 --resblock_updown True 
 --use_new_attention_order True 

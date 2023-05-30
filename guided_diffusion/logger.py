@@ -15,6 +15,7 @@ import warnings
 from collections import defaultdict
 from contextlib import contextmanager
 
+import wandb
 DEBUG = 10
 INFO = 20
 WARN = 30
@@ -216,6 +217,7 @@ def logkv(key, val):
     If called many times, last value will be used.
     """
     get_current().logkv(key, val)
+    wandb.log({key:val})
 
 
 def logkv_mean(key, val):
@@ -223,6 +225,7 @@ def logkv_mean(key, val):
     The same as logkv(), but if called many times, values averaged.
     """
     get_current().logkv_mean(key, val)
+    wandb.log({key:val})
 
 
 def logkvs(d):
@@ -443,6 +446,16 @@ def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
     """
     If comm is provided, average all numerical stats across that comm
     """
+
+    wandb.login()
+    run = wandb.init(
+    # Set the project where this run will be logged
+    project="guided-diffusion",
+    # Track hyperparameters and run metadata
+    )
+
+
+    
     if dir is None:
         dir = os.getenv("OPENAI_LOGDIR")
     if dir is None:

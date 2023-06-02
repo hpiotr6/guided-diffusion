@@ -615,6 +615,10 @@ class UNetModel(nn.Module):
             zero_module(conv_nd(dims, input_ch, out_channels, 3, padding=1)),
         )
 
+
+
+        self.num_classes = None
+
     def convert_to_fp16(self):
         """
         Convert the torso of the model to float16.
@@ -640,10 +644,6 @@ class UNetModel(nn.Module):
         :param y: an [N] Tensor of labels, if class-conditional.
         :return: an [N x C x ...] Tensor of outputs.
         """
-        assert (y is not None) == (
-            self.num_classes is not None
-        ), "must specify y if and only if the model is class-conditional"
-
         hs = []
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
 

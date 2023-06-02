@@ -62,8 +62,7 @@ def main():
             return th.autograd.grad(selected.sum(), x_in)[0] * args.classifier_scale
 
     def model_fn(x, t, y=None):
-        assert y is not None
-        return model(x, t, y if args.class_cond else None)
+        return model(x, t, None)
 
     logger.log("sampling...")
     all_images = []

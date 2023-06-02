@@ -19,7 +19,7 @@ python3.10 \
     -m scripts.classifier_sample \
     $MODEL_FLAGS \
     --classifier_scale 1.0 \
-    --classifier_path models/64x64/model000299.pt \
+    --classifier_path logs/0530-14-36-18/tmp/openai-2023-05-30-14-36-25-306984/model000299.pt \
     --classifier_depth 2 \
     --model_path models/64x64_diffusion.pt \
     $SAMPLE_FLAGS

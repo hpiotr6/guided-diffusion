@@ -17,6 +17,7 @@ def load_data(
     deterministic=False,
     random_crop=False,
     random_flip=True,
+    weighted_samplng=False,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -71,15 +72,6 @@ def load_data(
         random_crop=random_crop,
         random_flip=random_flip,
     )
-
-
-    weighted_samplng = True
-    if deterministic:
-        loader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=False, num_workers=1, drop_last=True
-        )
-
-
     if weighted_samplng:
         class_count = np.unique(classes, return_counts=True)[1]
         weight = 1.0 / class_count
@@ -87,6 +79,10 @@ def load_data(
         sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
         loader = DataLoader(
             dataset, batch_size=batch_size, num_workers=1, drop_last=True, sampler=sampler
+        )
+    elif deterministic:
+        loader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=False, num_workers=1, drop_last=True
         )
     else:
         loader = DataLoader(

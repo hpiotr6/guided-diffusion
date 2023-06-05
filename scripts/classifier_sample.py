@@ -12,6 +12,7 @@ import torch.distributed as dist
 import torch.nn.functional as F
 
 from guided_diffusion import dist_util, logger
+from guided_diffusion.image_datasets import load_data
 from guided_diffusion.script_util import (
     NUM_CLASSES,
     model_and_diffusion_defaults,
@@ -29,6 +30,17 @@ def main():
 
     dist_util.setup_dist()
     logger.configure()
+
+    logger.log("loading data...")
+    data = load_data(
+        data_dir="datasets/GT-RAIN/GT-RAIN_test",
+        batch_size=args.batch_size,
+        image_size=args.image_size,
+        class_cond=False,
+        deterministic=True,
+    )
+    batch, extra = next(data)
+
 
     logger.log("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(
@@ -68,6 +80,7 @@ def main():
     logger.log("sampling...")
     all_images = []
     all_labels = []
+
     while len(all_images) * args.batch_size < args.num_samples:
         model_kwargs = {}
         classes = th.randint(
@@ -77,9 +90,17 @@ def main():
         sample_fn = (
             diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
         )
+        t = th.full((args.batch_size,), int(args.timestep_respacing)-1)
+        batch = diffusion.q_sample(batch, t)
+        shape = (args.batch_size, 3, args.image_size, args.image_size)
+        # assert shape == batch.shape
+
+
+
         sample = sample_fn(
             model_fn,
-            (args.batch_size, 3, args.image_size, args.image_size),
+            shape,
+            noise=batch,
             clip_denoised=args.clip_denoised,
             model_kwargs=model_kwargs,
             cond_fn=cond_fn,

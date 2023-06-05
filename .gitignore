@@ -198,4 +198,6 @@ slurm*
 datasets/*
 models/
 run_slurm.sh
-.vscode/tasks.json
+.vscode/
+requirements.txt
+wandb/

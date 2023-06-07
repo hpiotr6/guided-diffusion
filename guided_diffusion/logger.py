@@ -209,6 +209,9 @@ def make_output_format(format, ev_dir, log_suffix=""):
 # API
 # ================================================================
 
+def logconfig(key, val):
+    info(key, " : ", val)
+    wandb.summary[key] = val
 
 def logkv(key, val):
     """
@@ -455,7 +458,7 @@ def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
     )
 
 
-    
+
     if dir is None:
         dir = os.getenv("OPENAI_LOGDIR")
     if dir is None:

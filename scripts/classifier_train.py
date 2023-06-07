@@ -43,6 +43,12 @@ def main():
             args.schedule_sampler, diffusion
         )
 
+    logger.logconfig("dropout", model.dropout)
+    logger.logconfig("lr", args.lr)
+    logger.logconfig("iterations", args.iterations)
+    logger.logconfig("batch_size", args.batch_size)
+
+
     resume_step = 0
     if args.resume_checkpoint:
         resume_step = parse_resume_step_from_filename(args.resume_checkpoint)
@@ -126,9 +132,9 @@ def main():
             losses[f"{prefix}_acc@1"] = compute_top_k(
                 logits, sub_labels, k=1, reduction="none"
             )
-            losses[f"{prefix}_acc@5"] = compute_top_k(
-                logits, sub_labels, k=5, reduction="none"
-            )
+            # losses[f"{prefix}_acc@5"] = compute_top_k(
+            #     logits, sub_labels, k=5, reduction="none"
+            # )
             log_loss_dict(diffusion, sub_t, losses)
             del losses
             loss = loss.mean()

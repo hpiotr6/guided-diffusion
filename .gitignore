@@ -196,6 +196,7 @@ pyrightconfig.json
 
 slurm*
 datasets/*
-models/
+models
+wandb/*
 run_slurm.sh
 .vscode/tasks.json

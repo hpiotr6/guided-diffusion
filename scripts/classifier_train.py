@@ -43,10 +43,11 @@ def main():
             args.schedule_sampler, diffusion
         )
 
-    logger.logconfig("dropout", model.dropout)
     logger.logconfig("lr", args.lr)
     logger.logconfig("iterations", args.iterations)
     logger.logconfig("batch_size", args.batch_size)
+    logger.logconfig("weight_decay", args.weight_decay)
+    logger.logconfig("classifier_depth", args.classifier_depth)
 
 
     resume_step = 0
@@ -92,6 +93,7 @@ def main():
             batch_size=args.batch_size,
             image_size=args.image_size,
             class_cond=True,
+            deterministic=True
         )
     else:
         val_data = None
@@ -132,9 +134,6 @@ def main():
             losses[f"{prefix}_acc@1"] = compute_top_k(
                 logits, sub_labels, k=1, reduction="none"
             )
-            # losses[f"{prefix}_acc@5"] = compute_top_k(
-            #     logits, sub_labels, k=5, reduction="none"
-            # )
             log_loss_dict(diffusion, sub_t, losses)
             del losses
             loss = loss.mean()

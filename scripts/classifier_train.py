@@ -3,14 +3,16 @@ Train a noised image classifier on ImageNet.
 """
 
 import argparse
+from functools import partial
 import os
-
+from guided_diffusion import unet
 import blobfile as bf
 import torch as th
 import torch.distributed as dist
 import torch.nn.functional as F
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
+import re
 
 from guided_diffusion import dist_util, logger
 from guided_diffusion.fp16_util import MixedPrecisionTrainer
@@ -56,6 +58,43 @@ def main():
                 )
             )
 
+    def freeze_layers(model, regex):
+        for name, p in model.named_parameters():
+            if bool(regex(string=name)):
+                p.requires_grad = True
+            else:
+                p.requires_grad = False
+
+    regex = partial(re.search, pattern=r"^out\..*")
+    freeze_layers(model, regex)
+    # layers_to_unfreeze = ["out"]
+
+    # Freeze all layers except the specified ones and exclude layers of type AttentionBlock
+    # for name, module in model.named_modules():
+    #     # if any(layer_name == name for layer_name in layers_to_unfreeze):
+    #     if
+    #         for param in module.parameters():
+    #             param.requires_grad = True
+    #     else:
+    #         for param in module.parameters():
+    #             param.requires_grad = False
+
+    model.out[2].c_proj = th.nn.Conv1d(512, 2, kernel_size=(1,), stride=(1,))
+
+    num_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    # Helper function to convert number of parameters to human-readable format
+    def format_parameters(num_params):
+        if num_params >= 1e6:
+            return f"{num_params/1e6:.2f}M"
+        if num_params >= 1e3:
+            return f"{num_params/1e3:.2f}K"
+        return str(num_params)
+
+    # Convert and print the number of trainable parameters
+    formatted_params = format_parameters(num_trainable_params)
+    print(f"Number of trainable parameters: {formatted_params}")
+
     # Needed for creating correct EMAs and fp16 parameters.
     dist_util.sync_params(model.parameters())
 
@@ -65,8 +104,8 @@ def main():
 
     model = DDP(
         model,
-        device_ids=[dist_util.dev()] if dist_util.dev().type!='cpu' else None,
-        output_device=dist_util.dev() if dist_util.dev().type!='cpu' else None,
+        device_ids=[dist_util.dev()] if dist_util.dev().type != "cpu" else None,
+        output_device=dist_util.dev() if dist_util.dev().type != "cpu" else None,
         broadcast_buffers=False,
         bucket_cap_mb=128,
         find_unused_parameters=False,
@@ -79,6 +118,7 @@ def main():
         image_size=args.image_size,
         class_cond=True,
         random_crop=True,
+        weighted_samplng=True,
     )
     if args.val_data_dir:
         val_data = load_data(
@@ -86,6 +126,7 @@ def main():
             batch_size=args.batch_size,
             image_size=args.image_size,
             class_cond=True,
+            weighted_samplng=True,
         )
     else:
         val_data = None
@@ -96,11 +137,10 @@ def main():
         opt_checkpoint = bf.join(
             bf.dirname(args.resume_checkpoint), f"opt{resume_step:06}.pt"
         )
-        logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
-        opt.load_state_dict(
-            dist_util.load_state_dict(opt_checkpoint, map_location=dist_util.dev())
-        )
-
+        # logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
+        # opt.load_state_dict(
+        #     dist_util.load_state_dict(opt_checkpoint, map_location=dist_util.dev())
+        # )
     logger.log("training classifier model...")
 
     def forward_backward_log(data_loader, prefix="train"):
@@ -126,9 +166,9 @@ def main():
             losses[f"{prefix}_acc@1"] = compute_top_k(
                 logits, sub_labels, k=1, reduction="none"
             )
-            losses[f"{prefix}_acc@5"] = compute_top_k(
-                logits, sub_labels, k=5, reduction="none"
-            )
+            # losses[f"{prefix}_acc@5"] = compute_top_k(
+            #     logits, sub_labels, k=5, reduction="none"
+            # )
             log_loss_dict(diffusion, sub_t, losses)
             del losses
             loss = loss.mean()

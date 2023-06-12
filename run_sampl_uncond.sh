@@ -1,11 +1,12 @@
 # !/bin/bash
 SAMPLE_FLAGS="--batch_size 16
 --num_samples 16 
---timestep_respacing 250"
+--timestep_respacing 250
+"
 
 MODEL_FLAGS="--attention_resolutions 32,16,8 
 --class_cond False 
---diffusion_steps 1000 
+--diffusion_steps 1000
 --image_size 256 
 --learn_sigma True 
 --noise_schedule linear 

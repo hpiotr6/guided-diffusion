@@ -22,7 +22,7 @@ from guided_diffusion.script_util import (
     add_dict_to_argparser,
     args_to_dict,
 )
-
+from guided_diffusion.gaussian_diffusion import num_back_steps
 
 
 def main():
@@ -40,6 +40,8 @@ def main():
         deterministic=True,
     )
     batch, extra = next(data)
+
+    batch = batch.to(dist_util.dev())
 
 
     logger.log("creating model and diffusion...")
@@ -90,7 +92,8 @@ def main():
         sample_fn = (
             diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
         )
-        t = th.full((args.batch_size,), int(args.timestep_respacing)-1)
+        NUM_BACK_STEPS = num_back_steps(args.timestep_respacing)
+        t = th.full((args.batch_size,), NUM_BACK_STEPS, device=dist_util.dev())
         batch = diffusion.q_sample(batch, t)
         shape = (args.batch_size, 3, args.image_size, args.image_size)
         # assert shape == batch.shape

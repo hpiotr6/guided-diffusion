@@ -13,7 +13,7 @@ CLASSIFIER_FLAGS="--image_size 64
 --classifier_resblock_updown True
 --classifier_use_scale_shift_norm True"
 
-python \
+python3.10 \
     -m scripts.classifier_train \
     --data_dir datasets/GT-RAIN/GT-RAIN_train \
     --val_data_dir datasets/GT-RAIN/GT-RAIN_val \

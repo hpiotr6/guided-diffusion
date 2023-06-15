@@ -12,7 +12,7 @@ import torch.distributed as dist
 import torch.nn.functional as F
 
 from guided_diffusion import dist_util, logger
-from guided_diffusion.image_datasets import load_data, get_data_loaders, iterable, join_from_tiles
+from guided_diffusion.image_datasets import load_data, get_data_loaders, join_from_tiles
 from guided_diffusion.script_util import (
     NUM_CLASSES,
     model_and_diffusion_defaults,
@@ -82,7 +82,7 @@ def main():
 
     for i, (loader, width, height) in enumerate(loaders):
         logger.log(f"sampling image no. {i+1}")
-        data = iterable(loader)
+        data = list(loader)
 
         fragments = []
         for batch, extra in data:

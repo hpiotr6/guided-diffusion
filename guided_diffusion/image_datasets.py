@@ -56,9 +56,6 @@ def get_data_loaders(
         loaders = random.shuffle(loaders)
     return loaders
 
-def iterable(loader):
-    while True:
-        yield from loader
 
 def divide_into_tiles(image, image_size, margin):
     height = image.height

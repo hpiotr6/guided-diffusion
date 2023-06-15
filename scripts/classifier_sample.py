@@ -12,7 +12,7 @@ import torch.distributed as dist
 import torch.nn.functional as F
 
 from guided_diffusion import dist_util, logger
-from guided_diffusion.image_datasets import load_data
+from guided_diffusion.image_datasets import load_data, load_data_fragments
 from guided_diffusion.script_util import (
     NUM_CLASSES,
     model_and_diffusion_defaults,
@@ -32,12 +32,20 @@ def main():
     logger.configure()
 
     logger.log("loading data...")
-    data = load_data(
+    # data = load_data(
+    #     data_dir="datasets/GT-RAIN/GT-RAIN_test",
+    #     batch_size=args.batch_size,
+    #     image_size=args.image_size,
+    #     class_cond=False,
+    #     deterministic=True,
+    #     random_crop=False,
+    #     random_flip=False
+    # )
+
+    data = load_data_fragments(
         data_dir="datasets/GT-RAIN/GT-RAIN_test",
         batch_size=args.batch_size,
         image_size=args.image_size,
-        class_cond=False,
-        deterministic=True,
     )
     batch, extra = next(data)
 

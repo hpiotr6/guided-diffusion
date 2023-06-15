@@ -201,3 +201,6 @@ run_slurm.sh
 .vscode/
 requirements.txt
 wandb/
+
+logs/*
+results/*

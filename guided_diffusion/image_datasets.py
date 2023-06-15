@@ -9,6 +9,100 @@ from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
 import re
 
+def load_data_fragments(
+    *,
+    data_dir,
+    image_size,
+    batch_size
+    ):
+
+    all_files = _list_image_files_recursively(data_dir)
+    regex = r"([A-Za-z]+_?[A-Za-z]+).*-([C])-.*\.png"
+    for path in all_files:
+        filename = bf.basename(path)
+        match = re.match(regex, filename)
+        if match:
+            all_files.remove(path)
+
+
+    for path in all_files:
+        filename = bf.basename(path)
+
+        #podzielenie na kawałki
+        with bf.BlobFile(path, "rb") as f:
+            pil_image = Image.open(f)
+            pil_image.load()
+        pil_image = pil_image.convert("RGB")
+        height = pil_image.height
+        width = pil_image.width
+
+        tiles = []
+        x = 0
+        while x + image_size < width:
+            y = 0
+            while y + image_size < height:
+                tiles.append(pil_image.crop((x, y, x+image_size, y+image_size)))
+                y += image_size
+            tiles.append(pil_image.crop(
+                (x, height-image_size, x+image_size, height)))
+            x += image_size
+        y = 0
+        while y + image_size < height:
+            tiles.append(pil_image.crop(
+                (width-image_size, y, width, y+image_size)))
+            y += image_size
+        tiles.append(pil_image.crop((width-image_size,
+                     height-image_size, width, height)))
+
+        dataset = MyImageDataset(
+            image_size,
+            tiles,
+            classes=None,
+            shard=MPI.COMM_WORLD.Get_rank(),
+            num_shards=MPI.COMM_WORLD.Get_size()
+        )
+        loader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=False, num_workers=1, drop_last=False
+        )
+        try:
+            while True:
+                yield from loader
+        except StopIteration:
+            pass
+
+    raise StopIteration
+
+
+
+class MyImageDataset(Dataset):
+    def __init__(
+        self,
+        resolution,
+        images,
+        classes=None,
+        shard=0,
+        num_shards=1,
+    ):
+        super().__init__()
+        self.resolution = resolution
+        self.local_images = images[shard:][::num_shards]
+        self.local_classes = None if classes is None else classes[shard:][::num_shards]
+
+    def __len__(self):
+        return len(self.local_images)
+
+    def __getitem__(self, idx):
+        pil_image = self.local_images[idx]
+
+        arr = center_crop_arr(pil_image, self.resolution)
+
+        arr = arr.astype(np.float32) / 127.5 - 1
+
+        out_dict = {}
+        if self.local_classes is not None:
+            out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
+        return np.transpose(arr, [2, 0, 1]), out_dict
+
 def load_data(
     *,
     data_dir,

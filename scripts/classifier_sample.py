@@ -122,18 +122,17 @@ def main():
 
             gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
             dist.all_gather(gathered_samples, sample)  # gather not supported with NCCL
-            fragments.extend([sample.cpu().numpy() for sample in gathered_samples])
+            for sample in gathered_samples:
+                for image in sample.cpu().numpy():
+                    logger.log(image.shape)
+                    fragments.append(image)
             logger.log(f"number of fragments: {len(fragments)}")
 
-        for tile in fragments:
-            logger.log(tile.shape)
-        logger.log(f"joining image no. {i+1}")
-
-        all_images.extend(join_from_tiles(fragments, width, height))
+        all_images.append(join_from_tiles(fragments, width, height))
         gathered_labels = [th.zeros_like(classes) for _ in range(dist.get_world_size())]
         dist.all_gather(gathered_labels, classes)
         all_labels.extend([labels.cpu().numpy() for labels in gathered_labels])
-        logger.log(f"created {len(all_images) * args.batch_size} samples")
+        logger.log(f"joined {len(all_images)} images")
 
     arr = np.concatenate(all_images, axis=0)
     arr = arr[: args.num_samples]

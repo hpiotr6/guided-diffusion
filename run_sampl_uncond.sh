@@ -1,5 +1,5 @@
 # !/bin/bash
-SAMPLE_FLAGS="--batch_size 5
+SAMPLE_FLAGS="--batch_size 3
 --num_samples 2
 --timestep_respacing 250
 "

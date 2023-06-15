@@ -9,11 +9,13 @@ from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
 import re
 
-def load_data_fragments(
+def get_data_loaders(
     *,
     data_dir,
     image_size,
-    batch_size
+    batch_size,
+    shuffle=False,
+    length=-1
     ):
 
     all_files_ = _list_image_files_recursively(data_dir)
@@ -25,35 +27,16 @@ def load_data_fragments(
         if not match:
             all_files.append(path)
 
-
+    loaders = []
     for path in all_files:
         filename = bf.basename(path)
 
-        # podzielenie na kawałki
         with bf.BlobFile(path, "rb") as f:
             pil_image = Image.open(f)
             pil_image.load()
         pil_image = pil_image.convert("RGB")
-        height = pil_image.height
-        width = pil_image.width
 
-        tiles = []
-        x = 0
-        while x + image_size < width:
-            y = 0
-            while y + image_size < height:
-                tiles.append(pil_image.crop((x, y, x+image_size, y+image_size)))
-                y += image_size
-            tiles.append(pil_image.crop(
-                (x, max(0, height-image_size), x+image_size, height)))
-            x += image_size
-        y = 0
-        while y + image_size < height:
-            tiles.append(pil_image.crop(
-                (max(0, width-image_size), y, width, y+image_size)))
-            y += image_size
-        tiles.append(pil_image.crop((max(0, width-image_size),
-                     max(0, height-image_size), width, height)))
+        tiles, width, height = divide_into_tiles(pil_image, image_size, 10)
 
         dataset = MyImageDataset(
             image_size,
@@ -65,14 +48,44 @@ def load_data_fragments(
         loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=1, drop_last=False
         )
-        try:
-            while True:
-                yield from loader
-        except StopIteration:
-            pass
+        loaders.append((loader, width, height))
+        if len(loaders) == length:
+            break
 
-    raise StopIteration
+    if shuffle:
+        loaders = random.shuffle(loaders)
+    return loaders
 
+def iterable(loader):
+    while True:
+        yield from loader
+
+def divide_into_tiles(image, image_size, margin):
+    height = image.height
+    width = image.width
+
+    tiles = []
+    x = 0
+    while x + image_size < width:
+        y = 0
+        while y + image_size < height:
+            tiles.append(image.crop((x, y, x+image_size, y+image_size)))
+            y += image_size
+        tiles.append(image.crop(
+            (x, max(0, height-image_size), x+image_size, height)))
+        x += image_size
+    y = 0
+    while y + image_size < height:
+        tiles.append(image.crop(
+            (max(0, width-image_size), y, width, y+image_size)))
+        y += image_size
+    tiles.append(image.crop((max(0, width-image_size),
+                    max(0, height-image_size), width, height)))
+
+    return tiles, width, height
+
+def join_from_tiles(tiles, width, height):
+    pass
 
 
 class MyImageDataset(Dataset):

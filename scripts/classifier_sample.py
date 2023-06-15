@@ -12,7 +12,7 @@ import torch.distributed as dist
 import torch.nn.functional as F
 
 from guided_diffusion import dist_util, logger
-from guided_diffusion.image_datasets import load_data, load_data_fragments
+from guided_diffusion.image_datasets import load_data, get_data_loaders, iterable, join_from_tiles
 from guided_diffusion.script_util import (
     NUM_CLASSES,
     model_and_diffusion_defaults,
@@ -32,29 +32,14 @@ def main():
     logger.configure()
 
     logger.log("loading data...")
-    # data = load_data(
-    #     data_dir="datasets/GT-RAIN/GT-RAIN_test",
-    #     batch_size=args.batch_size,
-    #     image_size=args.image_size,
-    #     class_cond=False,
-    #     deterministic=True,
-    #     random_crop=False,
-    #     random_flip=False
-    # )
 
-    data = load_data_fragments(
+    loaders = get_data_loaders(
         data_dir="datasets/GT-RAIN/GT-RAIN_test",
         batch_size=args.batch_size,
         image_size=args.image_size,
+        shuffle=False,
+        length=args.num_samples
     )
-    batch, extra = next(data)
-    if batch.shape[0] < args.batch_size:
-        temp = th.zeros(args.batch_size, *batch.shape[1:])
-        temp[:batch.shape[0], ...] = batch
-        batch = temp
-
-    batch = batch.to(dist_util.dev())
-
 
     logger.log("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(
@@ -95,39 +80,56 @@ def main():
     all_images = []
     all_labels = []
 
-    while len(all_images) * args.batch_size < args.num_samples:
-        model_kwargs = {}
-        classes = th.randint(
-            low=0, high=1, size=(args.batch_size,), device=dist_util.dev()
-        )
-        model_kwargs["y"] = classes
-        sample_fn = (
-            diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
-        )
-        NUM_BACK_STEPS = num_back_steps(args.timestep_respacing)
-        t = th.full((args.batch_size,), NUM_BACK_STEPS, device=dist_util.dev())
-        batch = diffusion.q_sample(batch, t)
-        shape = (args.batch_size, 3, args.image_size, args.image_size)
-        # assert shape == batch.shape
+    for i, (loader, width, height) in enumerate(loaders):
+        logger.log(f"sampling image no. {i+1}")
+        data = iterable(loader)
 
+        fragments = []
+        for batch, extra in data:
+            if batch.shape[0] < args.batch_size:
+                temp = th.zeros(args.batch_size, *batch.shape[1:])
+                temp[:batch.shape[0], ...] = batch
+                batch = temp
 
+            batch = batch.to(dist_util.dev())
 
-        sample = sample_fn(
-            model_fn,
-            shape,
-            noise=batch,
-            clip_denoised=args.clip_denoised,
-            model_kwargs=model_kwargs,
-            cond_fn=cond_fn,
-            device=dist_util.dev(),
-        )
-        sample = ((sample + 1) * 127.5).clamp(0, 255).to(th.uint8)
-        sample = sample.permute(0, 2, 3, 1)
-        sample = sample.contiguous()
+            model_kwargs = {}
+            classes = th.randint(
+                low=0, high=1, size=(args.batch_size,), device=dist_util.dev()
+            )
+            model_kwargs["y"] = classes
+            sample_fn = (
+                diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
+            )
+            NUM_BACK_STEPS = num_back_steps(args.timestep_respacing)
+            t = th.full((args.batch_size,), NUM_BACK_STEPS, device=dist_util.dev())
+            batch = diffusion.q_sample(batch, t)
+            shape = (args.batch_size, 3, args.image_size, args.image_size)
+            # assert shape == batch.shape
 
-        gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
-        dist.all_gather(gathered_samples, sample)  # gather not supported with NCCL
-        all_images.extend([sample.cpu().numpy() for sample in gathered_samples])
+            sample = sample_fn(
+                model_fn,
+                shape,
+                noise=batch,
+                clip_denoised=args.clip_denoised,
+                model_kwargs=model_kwargs,
+                cond_fn=cond_fn,
+                device=dist_util.dev(),
+            )
+            sample = ((sample + 1) * 127.5).clamp(0, 255).to(th.uint8)
+            sample = sample.permute(0, 2, 3, 1)
+            sample = sample.contiguous()
+
+            gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
+            dist.all_gather(gathered_samples, sample)  # gather not supported with NCCL
+            fragments.extend([sample.cpu().numpy() for sample in gathered_samples])
+            logger.log(f"number of fragments: {len(fragments)}")
+
+        for tile in fragments:
+            logger.log(tile.shape)
+        logger.log(f"joining image no. {i+1}")
+
+        all_images.extend(join_from_tiles(fragments, width, height))
         gathered_labels = [th.zeros_like(classes) for _ in range(dist.get_world_size())]
         dist.all_gather(gathered_labels, classes)
         all_labels.extend([labels.cpu().numpy() for labels in gathered_labels])

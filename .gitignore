@@ -196,7 +196,7 @@ pyrightconfig.json
 
 slurm*
 datasets/*
-models/
+
 run_slurm.sh
 .vscode/
 requirements.txt

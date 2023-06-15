@@ -186,7 +186,7 @@ def load_data(
         class_count = np.unique(classes, return_counts=True)[1]
         weight = 1.0 / class_count
         samples_weight = weight[classes]
-        sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
+        sampler = WeightedRandomSampler(samples_weight, len(samples_weight), replacement=not deterministic)
         loader = DataLoader(
             dataset, batch_size=batch_size, num_workers=1, drop_last=True, sampler=sampler
         )

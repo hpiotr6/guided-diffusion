@@ -31,7 +31,7 @@ def main():
     args = create_argparser().parse_args()
 
     dist_util.setup_dist()
-    logger.configure()
+    logger.configure(argp=args)
 
     print(dist_util.dev())
 
@@ -65,7 +65,7 @@ def main():
             else:
                 p.requires_grad = False
 
-    regex = partial(re.search, pattern=r"^out\..*")
+    regex = partial(re.search, pattern=r"^out\..*|^middle_block\.2")
     freeze_layers(model, regex)
     # layers_to_unfreeze = ["out"]
 
@@ -79,7 +79,7 @@ def main():
     #         for param in module.parameters():
     #             param.requires_grad = False
 
-    model.out[2].c_proj = th.nn.Conv1d(512, 2, kernel_size=(1,), stride=(1,))
+    model.out[2].c_proj = th.nn.Conv1d(512, 2, kernel_size=(1,), stride=(1,), device=dist_util.dev())
 
     num_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -127,6 +127,7 @@ def main():
             image_size=args.image_size,
             class_cond=True,
             weighted_samplng=True,
+            deterministic=True,
         )
     else:
         val_data = None

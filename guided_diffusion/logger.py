@@ -442,7 +442,7 @@ def mpi_weighted_mean(comm, local_name2valcount):
         return {}
 
 
-def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
+def configure(dir=None, format_strs=None, comm=None, log_suffix="", argp=None):
     """
     If comm is provided, average all numerical stats across that comm
     """
@@ -450,12 +450,16 @@ def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
     wandb.login()
     run = wandb.init(
     # Set the project where this run will be logged
-    project="guided-diffusion",
+    project="join_images",
     # Track hyperparameters and run metadata
     )
 
+    if argp is not None:
+        args_dict = vars(argp)
+        wandb.config.update(args_dict)
 
-    
+
+
     if dir is None:
         dir = os.getenv("OPENAI_LOGDIR")
     if dir is None:

@@ -14,7 +14,7 @@ import torch as th
 from .nn import mean_flat
 from .losses import normal_kl, discretized_gaussian_log_likelihood
 
-num_back_steps = lambda x: int(int(x)*0.3)
+num_back_steps = lambda x: int(int(x)*0.2)
 
 def get_named_beta_schedule(schedule_name, num_diffusion_timesteps):
     """
@@ -512,7 +512,7 @@ class GaussianDiffusion:
             img = noise
         else:
             img = th.randn(*shape, device=device)
-        BACK_STEPS = num_back_steps(self.num_timesteps) 
+        BACK_STEPS = num_back_steps(self.num_timesteps)
         indices = list(range(BACK_STEPS))[::-1]
 
         # indices = list(range(self.num_timesteps))[::-1]
@@ -522,7 +522,7 @@ class GaussianDiffusion:
             from tqdm.auto import tqdm
 
             indices = tqdm(indices)
-        
+
         # FIXME:!!!!!
         for i in indices:
             t = th.tensor([i] * shape[0], device=device)

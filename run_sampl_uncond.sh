@@ -1,5 +1,5 @@
 # !/bin/bash
-SAMPLE_FLAGS="--batch_size 4
+SAMPLE_FLAGS="--batch_size 16
 --num_samples 16
 --timestep_respacing 250
 "
@@ -20,6 +20,8 @@ python3.10 \
     -m scripts.classifier_sample \
     $MODEL_FLAGS \
     --classifier_scale 10.0 \
-    --classifier_path models/256x256_classifier.pt \
+    --classifier_path model17.pt \
     --model_path models/256x256_diffusion_uncond.pt \
     $SAMPLE_FLAGS
+
+# --classifier_path models/256x256_classifier.pt \

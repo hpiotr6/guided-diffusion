@@ -48,6 +48,10 @@ def main():
         image_size=args.image_size,
     )
     batch, extra = next(data)
+    if batch.shape[0] < args.batch_size:
+        temp = th.zeros(args.batch_size, *batch.shape[1:])
+        temp[:batch.shape[0], ...] = batch
+        batch = temp
 
     batch = batch.to(dist_util.dev())
 

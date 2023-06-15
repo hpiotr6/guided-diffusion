@@ -16,19 +16,20 @@ def load_data_fragments(
     batch_size
     ):
 
-    all_files = _list_image_files_recursively(data_dir)
+    all_files_ = _list_image_files_recursively(data_dir)
     regex = r"([A-Za-z]+_?[A-Za-z]+).*-([C])-.*\.png"
-    for path in all_files:
+    all_files = []
+    for path in all_files_:
         filename = bf.basename(path)
         match = re.match(regex, filename)
-        if match:
-            all_files.remove(path)
+        if not match:
+            all_files.append(path)
 
 
     for path in all_files:
         filename = bf.basename(path)
 
-        #podzielenie na kawałki
+        # podzielenie na kawałki
         with bf.BlobFile(path, "rb") as f:
             pil_image = Image.open(f)
             pil_image.load()
@@ -44,15 +45,15 @@ def load_data_fragments(
                 tiles.append(pil_image.crop((x, y, x+image_size, y+image_size)))
                 y += image_size
             tiles.append(pil_image.crop(
-                (x, height-image_size, x+image_size, height)))
+                (x, max(0, height-image_size), x+image_size, height)))
             x += image_size
         y = 0
         while y + image_size < height:
             tiles.append(pil_image.crop(
-                (width-image_size, y, width, y+image_size)))
+                (max(0, width-image_size), y, width, y+image_size)))
             y += image_size
-        tiles.append(pil_image.crop((width-image_size,
-                     height-image_size, width, height)))
+        tiles.append(pil_image.crop((max(0, width-image_size),
+                     max(0, height-image_size), width, height)))
 
         dataset = MyImageDataset(
             image_size,

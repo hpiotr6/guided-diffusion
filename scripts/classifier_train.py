@@ -48,6 +48,7 @@ def main():
     logger.logconfig("batch_size", args.batch_size)
     logger.logconfig("weight_decay", args.weight_decay)
     logger.logconfig("classifier_depth", args.classifier_depth)
+    logger.logconfig("image_size", args.image_size)
 
 
     resume_step = 0

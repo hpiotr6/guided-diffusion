@@ -57,7 +57,7 @@ def get_data_loaders(
     return loaders
 
 
-def divide_into_tiles(image, image_size, margin):
+def divide_into_tiles(image, image_size, margin = 0):
     height = image.height
     width = image.width
 
@@ -67,22 +67,43 @@ def divide_into_tiles(image, image_size, margin):
         y = 0
         while y + image_size < height:
             tiles.append(image.crop((x, y, x+image_size, y+image_size)))
-            y += image_size
+            y += image_size - margin
         tiles.append(image.crop(
             (x, max(0, height-image_size), x+image_size, height)))
-        x += image_size
+        x += image_size - margin
     y = 0
     while y + image_size < height:
         tiles.append(image.crop(
             (max(0, width-image_size), y, width, y+image_size)))
-        y += image_size
+        y += image_size - margin
     tiles.append(image.crop((max(0, width-image_size),
                     max(0, height-image_size), width, height)))
 
     return tiles, width, height
 
 def join_from_tiles(tiles, width, height):
-    pass
+    image = np.zeros((height, width, 3))
+    image_size = tiles[0].shape[0]
+
+    i = 0
+    x = 0
+    while x + image_size < width:
+        y = 0
+        while y + image_size < height:
+            image[y:y+image_size,x:x+image_size,:] = tiles[i]
+            i+= 1
+            y += image_size
+        image[max(0, height-image_size):height, x:x+image_size, :] = tiles[i]
+        i+=1
+        x += image_size
+    y = 0
+    while y + image_size < height:
+        image[y:y+image_size,max(0, width-image_size):width, :] = tiles[i]
+        i+=1
+        y += image_size
+    image[max(0, height-image_size):height, max(0, width-image_size):width, :] = tiles[i]
+
+    return image
 
 
 class MyImageDataset(Dataset):

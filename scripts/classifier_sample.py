@@ -23,7 +23,7 @@ from guided_diffusion.script_util import (
     args_to_dict,
 )
 from guided_diffusion.gaussian_diffusion import num_back_steps
-
+from PIL import Image
 
 def main():
     args = create_argparser().parse_args()
@@ -80,12 +80,17 @@ def main():
     all_images = []
     all_labels = []
 
+    max_height = 0
+    max_width = 0
+
     for i, (loader, width, height) in enumerate(loaders):
+        max_height = max(max_height, height)
+        max_width = max(max_width, width)
         logger.log(f"sampling image no. {i+1}")
         data = list(loader)
 
         fragments = []
-        for batch, extra in data:
+        for j, (batch, extra) in enumerate(data):
             if batch.shape[0] < args.batch_size:
                 temp = th.zeros(args.batch_size, *batch.shape[1:])
                 temp[:batch.shape[0], ...] = batch
@@ -122,20 +127,32 @@ def main():
 
             gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
             dist.all_gather(gathered_samples, sample)  # gather not supported with NCCL
-            for sample in gathered_samples:
-                for image in sample.cpu().numpy():
-                    logger.log(image.shape)
+            for k, sample in enumerate(gathered_samples):
+                for l, image in enumerate(sample.cpu().numpy()):
                     fragments.append(image)
+                    out_path = os.path.join(logger.get_dir(), f"image_{i}_{j}_{k}_{l}.png")
+                    Image.fromarray(image).save(out_path)
+                    logger.log(f"created image_{i}_{j}_{k}_{l}.png")
+
             logger.log(f"number of fragments: {len(fragments)}")
 
-        all_images.append(join_from_tiles(fragments, width, height))
+        image = join_from_tiles(fragments, width, height).astype(np.uint8)
+        logger.log(image.shape, image.dtype, np.max(image))
+
+        out_path = os.path.join(logger.get_dir(), f"image_{i}.png")
+        Image.fromarray(image).save(out_path)
+
+        all_images.append(image)
         gathered_labels = [th.zeros_like(classes) for _ in range(dist.get_world_size())]
         dist.all_gather(gathered_labels, classes)
         all_labels.extend([labels.cpu().numpy() for labels in gathered_labels])
         logger.log(f"joined {len(all_images)} images")
 
-    arr = np.concatenate(all_images, axis=0)
-    arr = arr[: args.num_samples]
+    arr = np.zeros((args.num_samples, max_width, max_height, 3))
+    for i in range(args.num_samples):
+        sh = all_images[i].shape
+        arr[i,:sh[0],:sh[1],:] = all_images[i]/255
+
     label_arr = np.concatenate(all_labels, axis=0)
     label_arr = label_arr[: args.num_samples]
     if dist.get_rank() == 0:

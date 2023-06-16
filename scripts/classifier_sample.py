@@ -10,6 +10,7 @@ import numpy as np
 import torch as th
 import torch.distributed as dist
 import torch.nn.functional as F
+from torchmetrics import StructuralSimilarityIndexMeasure, PeakSignalNoiseRatio
 
 from guided_diffusion import dist_util, logger
 from guided_diffusion.image_datasets import load_data, get_data_loaders, join_from_tiles
@@ -39,7 +40,7 @@ def main():
         batch_size=args.batch_size,
         image_size=args.image_size,
         shuffle=False,
-        length=args.num_samples,
+        length=-1,#args.num_samples,
         margin=margin
     )
 
@@ -80,12 +81,14 @@ def main():
 
     logger.log("sampling...")
     all_images = []
-    all_labels = []
 
     max_height = 0
     max_width = 0
 
-    for i, (loader, width, height, grid) in enumerate(loaders):
+    ssim = StructuralSimilarityIndexMeasure()
+    ptnr = PeakSignalNoiseRatio()
+
+    for i, (loader, width, height, grid, clean_image) in enumerate(loaders):
         max_height = max(max_height, height)
         max_width = max(max_width, width)
         logger.log(f"sampling image no. {i+1}, width={width}, height={height}")
@@ -138,28 +141,35 @@ def main():
 
             logger.log(f"number of fragments: {len(fragments)}")
 
-        image = join_from_tiles(fragments, width, height, grid, margin).astype(np.uint8)
+        image = join_from_tiles(fragments, max(width, args.image_size), max(height, args.image_size), grid, margin).astype(np.uint8)
+        im = Image.fromarray(image)
+        if image.shape[0] > height or image.shape[1] > width:
+            im = im.resize((width, height))
         out_path = os.path.join(logger.get_dir(), f"image_{i}.png")
-        Image.fromarray(image).save(out_path)
+        im.save(out_path)
 
-        all_images.append(image)
-        gathered_labels = [th.zeros_like(classes) for _ in range(dist.get_world_size())]
-        dist.all_gather(gathered_labels, classes)
-        all_labels.extend([labels.cpu().numpy() for labels in gathered_labels])
+        derained = th.Tensor(im)
+        clean = th.Tensor(clean_image)
+
+
+        # all_images.append(image)
+        # gathered_labels = [th.zeros_like(classes) for _ in range(dist.get_world_size())]
+        # dist.all_gather(gathered_labels, classes)
+        # all_labels.extend([labels.cpu().numpy() for labels in gathered_labels])
         logger.log(f"joined {len(all_images)} images")
 
-    arr = np.zeros((args.num_samples, max_height, max_width, 3))
-    for i in range(args.num_samples):
-        sh = all_images[i].shape
-        arr[i,:sh[0],:sh[1],:] = all_images[i]/255
+    # arr = np.zeros((args.num_samples, max_height, max_width, 3))
+    # for i in range(args.num_samples):
+    #     sh = all_images[i].shape
+    #     arr[i,:sh[0],:sh[1],:] = all_images[i]/255
 
-    label_arr = np.concatenate(all_labels, axis=0)
-    label_arr = label_arr[: args.num_samples]
-    if dist.get_rank() == 0:
-        shape_str = "x".join([str(x) for x in arr.shape])
-        out_path = os.path.join(logger.get_dir(), f"samples_{shape_str}.npz")
-        logger.log(f"saving to {out_path}")
-        np.savez(out_path, arr, label_arr)
+    # label_arr = np.concatenate(all_labels, axis=0)
+    # label_arr = label_arr[: args.num_samples]
+    # if dist.get_rank() == 0:
+    #     shape_str = "x".join([str(x) for x in arr.shape])
+    #     out_path = os.path.join(logger.get_dir(), f"samples_{shape_str}.npz")
+    #     logger.log(f"saving to {out_path}")
+    #     np.savez(out_path, arr, label_arr)
 
     dist.barrier()
     logger.log("sampling complete")

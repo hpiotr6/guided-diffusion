@@ -21,12 +21,19 @@ def get_data_loaders(
 
     all_files_ = _list_image_files_recursively(data_dir)
     regex = r"([A-Za-z]+_?[A-Za-z]+).*-([C])-.*\.png"
+    without = {}
     all_files = []
     for path in all_files_:
         filename = bf.basename(path)
         match = re.match(regex, filename)
         if not match:
             all_files.append(path)
+        else:
+            with bf.BlobFile(path, "rb") as f:
+                pil_image = Image.open(f)
+                pil_image.load()
+            pil_image = pil_image.convert("RGB")
+            without[filename[:-10]] = pil_image
 
     loaders = []
     for path in all_files:
@@ -49,7 +56,10 @@ def get_data_loaders(
         loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=1, drop_last=False
         )
-        loaders.append((loader, width, height, grid))
+
+        clean = without[filename[:-10]]
+
+        loaders.append((loader, width, height, grid, clean))
         if len(loaders) == length:
             break
 

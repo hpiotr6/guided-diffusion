@@ -15,7 +15,8 @@ def get_data_loaders(
     image_size,
     batch_size,
     shuffle=False,
-    length=-1
+    length=-1,
+    margin=0
     ):
 
     all_files_ = _list_image_files_recursively(data_dir)
@@ -36,7 +37,7 @@ def get_data_loaders(
             pil_image.load()
         pil_image = pil_image.convert("RGB")
 
-        tiles, width, height = divide_into_tiles(pil_image, image_size, 10)
+        tiles, width, height, grid = divide_into_tiles(pil_image, image_size, margin)
 
         dataset = MyImageDataset(
             image_size,
@@ -48,7 +49,7 @@ def get_data_loaders(
         loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=1, drop_last=False
         )
-        loaders.append((loader, width, height))
+        loaders.append((loader, width, height, grid))
         if len(loaders) == length:
             break
 
@@ -63,14 +64,17 @@ def divide_into_tiles(image, image_size, margin = 0):
 
     tiles = []
     x = 0
+    grid = [1, 1]
     while x + image_size < width:
         y = 0
         while y + image_size < height:
             tiles.append(image.crop((x, y, x+image_size, y+image_size)))
             y += image_size - margin
+            grid[0] += 1
         tiles.append(image.crop(
             (x, max(0, height-image_size), x+image_size, height)))
         x += image_size - margin
+        grid[1] += 1
     y = 0
     while y + image_size < height:
         tiles.append(image.crop(
@@ -79,9 +83,9 @@ def divide_into_tiles(image, image_size, margin = 0):
     tiles.append(image.crop((max(0, width-image_size),
                     max(0, height-image_size), width, height)))
 
-    return tiles, width, height
+    return tiles, width, height, grid
 
-def join_from_tiles(tiles, width, height):
+def join_from_tiles(tiles, width, height, grid, margin = 0):
     image = np.zeros((height, width, 3))
     image_size = tiles[0].shape[0]
 
@@ -90,20 +94,54 @@ def join_from_tiles(tiles, width, height):
     while x + image_size < width:
         y = 0
         while y + image_size < height:
-            image[y:y+image_size,x:x+image_size,:] = tiles[i]
+            image[y:y+image_size,x: x+image_size, :] += apply_merging_margin(tiles[i], grid, i, margin)
             i+= 1
-            y += image_size
-        image[max(0, height-image_size):height, x:x+image_size, :] = tiles[i]
+            y += image_size - margin
+
+        image[y:height, x:x+image_size, :] += apply_merging_margin(tiles[i][image_size-height+y:,:,:], grid, i, margin)
         i+=1
-        x += image_size
+        x += image_size - margin
     y = 0
     while y + image_size < height:
-        image[y:y+image_size,max(0, width-image_size):width, :] = tiles[i]
+        image[y:y+image_size, x:width, :] += apply_merging_margin(tiles[i][:,image_size-width+x:,:], grid, i, margin)
         i+=1
-        y += image_size
-    image[max(0, height-image_size):height, max(0, width-image_size):width, :] = tiles[i]
+        y += image_size - margin
+    image[y:height, x:width, :] += apply_merging_margin(tiles[i][image_size-height+y:,image_size-width+x:,:], grid, i, margin)
 
     return image
+
+def apply_merging_margin(tile, grid, index, margin):
+    top = True
+    bottom = True
+    left = True
+    right = True
+    if index < grid[0]:
+        left = False
+    elif index >= grid[0]*(grid[1] -1):
+        right = False
+    if index % grid[0] == 0:
+        top = False
+    elif (index + 1) % grid[0] == 0:
+        bottom = False
+
+    height, width, _ = tile.shape
+
+    t = tile.dtype
+    tile = tile.astype(np.float64)
+    if top:
+        for i in range(margin):
+            tile[i,:,:] *= (i+1)/(margin+1)
+    if bottom:
+        for i in range(margin):
+            tile[height-i-1,:,:] *= (i+1)/(margin+1)
+    if left:
+        for i in range(margin):
+            tile[:,i,:] *= (i+1)/(margin+1)
+    if right:
+        for i in range(margin):
+            tile[:,width-i-1,:] *= (i+1)/(margin+1)
+
+    return tile.astype(t)
 
 
 class MyImageDataset(Dataset):

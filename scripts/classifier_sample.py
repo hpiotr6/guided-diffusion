@@ -31,6 +31,7 @@ def main():
     dist_util.setup_dist()
     logger.configure()
 
+    margin=10
     logger.log("loading data...")
 
     loaders = get_data_loaders(
@@ -38,7 +39,8 @@ def main():
         batch_size=args.batch_size,
         image_size=args.image_size,
         shuffle=False,
-        length=args.num_samples
+        length=args.num_samples,
+        margin=margin
     )
 
     logger.log("creating model and diffusion...")
@@ -83,10 +85,10 @@ def main():
     max_height = 0
     max_width = 0
 
-    for i, (loader, width, height) in enumerate(loaders):
+    for i, (loader, width, height, grid) in enumerate(loaders):
         max_height = max(max_height, height)
         max_width = max(max_width, width)
-        logger.log(f"sampling image no. {i+1}")
+        logger.log(f"sampling image no. {i+1}, width={width}, height={height}")
         data = list(loader)
 
         fragments = []
@@ -136,9 +138,7 @@ def main():
 
             logger.log(f"number of fragments: {len(fragments)}")
 
-        image = join_from_tiles(fragments, width, height).astype(np.uint8)
-        logger.log(image.shape, image.dtype, np.max(image))
-
+        image = join_from_tiles(fragments, width, height, grid, margin).astype(np.uint8)
         out_path = os.path.join(logger.get_dir(), f"image_{i}.png")
         Image.fromarray(image).save(out_path)
 
@@ -148,7 +148,7 @@ def main():
         all_labels.extend([labels.cpu().numpy() for labels in gathered_labels])
         logger.log(f"joined {len(all_images)} images")
 
-    arr = np.zeros((args.num_samples, max_width, max_height, 3))
+    arr = np.zeros((args.num_samples, max_height, max_width, 3))
     for i in range(args.num_samples):
         sh = all_images[i].shape
         arr[i,:sh[0],:sh[1],:] = all_images[i]/255

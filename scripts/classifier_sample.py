@@ -11,6 +11,7 @@ import torch as th
 import torch.distributed as dist
 import torch.nn.functional as F
 from torchmetrics import StructuralSimilarityIndexMeasure, PeakSignalNoiseRatio
+from torchvision import transforms
 
 from guided_diffusion import dist_util, logger
 from guided_diffusion.image_datasets import load_data, get_data_loaders, join_from_tiles
@@ -40,7 +41,7 @@ def main():
         batch_size=args.batch_size,
         image_size=args.image_size,
         shuffle=False,
-        length=-1,#args.num_samples,
+        length=args.num_samples,
         margin=margin
     )
 
@@ -148,9 +149,9 @@ def main():
         out_path = os.path.join(logger.get_dir(), f"image_{i}.png")
         im.save(out_path)
 
-        derained = th.Tensor(im)
-        clean = th.Tensor(clean_image)
-
+        derained = transforms.ToTensor()(im)
+        clean = transforms.ToTensor()(clean_image)
+        logger.log(f"sizes: {derained.shape}, {clean.shape}")
 
         # all_images.append(image)
         # gathered_labels = [th.zeros_like(classes) for _ in range(dist.get_world_size())]

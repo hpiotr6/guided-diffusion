@@ -20,7 +20,7 @@ def get_data_loaders(
     ):
 
     all_files_ = _list_image_files_recursively(data_dir)
-    regex = r"([A-Za-z]+_?[A-Za-z]+).*-([C])-.*\.png"
+    regex = r"([A-Za-z0-9]+_?[A-Za-z0-9]+).*-([C])-.*\.png"
     without = {}
     all_files = []
     for path in all_files_:

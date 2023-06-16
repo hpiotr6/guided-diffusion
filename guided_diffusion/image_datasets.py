@@ -117,11 +117,11 @@ def apply_merging_margin(tile, grid, index, margin):
     right = True
     if index < grid[0]:
         left = False
-    elif index >= grid[0]*(grid[1] -1):
+    if index >= grid[0]*(grid[1] -1):
         right = False
     if index % grid[0] == 0:
         top = False
-    elif (index + 1) % grid[0] == 0:
+    if (index + 1) % grid[0] == 0:
         bottom = False
 
     height, width, _ = tile.shape

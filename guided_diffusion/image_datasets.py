@@ -5,8 +5,9 @@ from PIL import Image
 import blobfile as bf
 from mpi4py import MPI
 import numpy as np
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
+import re
 
 def load_data(
     *,
@@ -17,6 +18,7 @@ def load_data(
     deterministic=False,
     random_crop=False,
     random_flip=True,
+    weighted_samplng=False,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -41,11 +43,40 @@ def load_data(
     all_files = _list_image_files_recursively(data_dir)
     classes = None
     if class_cond:
-        # Assume classes are the first part of the filename,
-        # before an underscore.
-        class_names = [bf.basename(path).split("_")[0] for path in all_files]
+        # # Assume classes are the first part of the filename,
+        # # before an underscore.
+        # class_names = [bf.basename(path).split("_")[0] for path in all_files]
+        regex = r"([A-Za-z]+_?[A-Za-z]+).*-([CR])-.*\.png"
+        class_names=[]
+        for path in all_files:
+            filename = bf.basename(path)
+            match = re.match(regex, filename)
+            if match:
+                city = match.group(1)
+                element = match.group(2)
+                class_names.append(element)
+                # print("City:", city)
+                # print("Element:", element)
+            else:
+                raise ValueError("No match found for filename:", filename)
+
         sorted_classes = {x: i for i, x in enumerate(sorted(set(class_names)))}
         classes = [sorted_classes[x] for x in class_names]
+    else:
+        # take only rainy classes
+        regex = r"([A-Za-z]+_?[A-Za-z]+).*-([C])-.*\.png"
+        for path in all_files:
+            filename = bf.basename(path)
+            match = re.match(regex, filename)
+            if match:
+                all_files.remove(path)
+                # city = match.group(1)
+                # element = match.group(2)
+                # print("City:", city)
+                # print("Element:", element)
+
+
+
     dataset = ImageDataset(
         image_size,
         all_files,
@@ -55,7 +86,16 @@ def load_data(
         random_crop=random_crop,
         random_flip=random_flip,
     )
-    if deterministic:
+
+    if weighted_samplng:
+        class_count = np.unique(classes, return_counts=True)[1]
+        weight = 1.0 / class_count
+        samples_weight = weight[classes]
+        sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
+        loader = DataLoader(
+            dataset, batch_size=batch_size, num_workers=1, drop_last=True, sampler=sampler
+        )
+    elif deterministic:
         loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=1, drop_last=True
         )

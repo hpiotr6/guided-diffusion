@@ -31,6 +31,8 @@ def main():
     dist_util.setup_dist()
     logger.configure()
 
+    print(dist_util.dev())
+
     logger.log("creating model and diffusion...")
     model, diffusion = create_classifier_and_diffusion(
         **args_to_dict(args, classifier_and_diffusion_defaults().keys())
@@ -63,8 +65,8 @@ def main():
 
     model = DDP(
         model,
-        device_ids=[dist_util.dev()],
-        output_device=dist_util.dev(),
+        device_ids=[dist_util.dev()] if dist_util.dev().type!='cpu' else None,
+        output_device=dist_util.dev() if dist_util.dev().type!='cpu' else None,
         broadcast_buffers=False,
         bucket_cap_mb=128,
         find_unused_parameters=False,
